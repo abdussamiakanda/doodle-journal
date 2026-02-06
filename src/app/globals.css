@@ -1,0 +1,87 @@
+@import url("https://fonts.googleapis.com/css2?family=Anonymous+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-garden-bg text-white min-h-screen;
+    font-family: "DM Mono", monospace;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-garden-cream rounded-2xl shadow-lg;
+  }
+
+  .garden-cell {
+    @apply flex items-center justify-center cursor-pointer transition-transform duration-200;
+  }
+
+  .garden-cell:hover {
+    @apply scale-110;
+  }
+
+  .garden-cell-empty {
+    @apply cursor-default;
+  }
+
+  .garden-cell-future {
+    @apply cursor-default opacity-40;
+  }
+
+  .garden-cell-future:hover {
+    @apply scale-100;
+  }
+}
+
+/* Page transition */
+.page-enter {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Grow animation for new doodles */
+.doodle-new {
+  animation: growIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Scrollbar styling for the garden */
+.garden-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.garden-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.garden-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.garden-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Textarea styling for journal */
+.journal-textarea {
+  @apply w-full min-h-[200px] resize-none bg-transparent text-garden-ink
+    font-display text-xl leading-relaxed
+    placeholder:text-garden-ink/30
+    focus:outline-none;
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 31px,
+    #e5e0d0 31px,
+    #e5e0d0 32px
+  );
+  background-position-y: 8px;
+  line-height: 32px;
+  padding-top: 8px;
+}

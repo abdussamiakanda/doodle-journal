@@ -4,6 +4,13 @@ import { cookies } from "next/headers";
 const COOKIE_NAME = "session";
 const EXPIRY_DAYS = 30;
 
+function isSecureCookie(): boolean {
+  if (process.env.COOKIE_SECURE !== undefined) {
+    return process.env.COOKIE_SECURE === "true";
+  }
+  return process.env.NODE_ENV === "production";
+}
+
 function getSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET is not set");
@@ -49,7 +56,7 @@ export function sessionCookieOptions(token: string) {
     name: COOKIE_NAME,
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(),
     sameSite: "lax" as const,
     path: "/",
     maxAge: EXPIRY_DAYS * 24 * 60 * 60,
@@ -61,7 +68,7 @@ export function clearSessionCookie() {
     name: COOKIE_NAME,
     value: "",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(),
     sameSite: "lax" as const,
     path: "/",
     maxAge: 0,

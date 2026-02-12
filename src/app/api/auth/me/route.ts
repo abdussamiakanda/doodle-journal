@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, validateSession, clearSessionCookie } from "@/lib/auth";
 
 export async function GET() {
   const session = await getSession();
@@ -8,7 +8,17 @@ export async function GET() {
     return NextResponse.json({ user: null }, { status: 401 });
   }
 
+  // Validate token version against database
+  const validSession = await validateSession(session);
+
+  if (!validSession) {
+    // Token version mismatch - session invalidated
+    const response = NextResponse.json({ user: null }, { status: 401 });
+    response.cookies.set(clearSessionCookie());
+    return response;
+  }
+
   return NextResponse.json({
-    user: { id: session.userId, username: session.username },
+    user: { id: validSession.userId, username: validSession.username },
   });
 }

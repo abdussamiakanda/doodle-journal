@@ -1,28 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, validateSession, clearSessionCookie } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getRandomUnusedDoodleId } from "@/lib/doodle-pool";
 import { JournalEntry, DateKey, DoodleId } from "@/types";
-
-interface EntryRow {
-  id: number;
-  user_id: number;
-  date_key: string;
-  text: string;
-  doodle_id: number;
-  created_at: string;
-  updated_at: string;
-}
-
-function rowToEntry(row: EntryRow): JournalEntry {
-  return {
-    dateKey: row.date_key as DateKey,
-    text: row.text,
-    doodleId: row.doodle_id as DoodleId,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
+import { logger } from "@/lib/logger";
+import { rowToEntry, EntryRow } from "@/lib/entries";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -30,18 +12,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Validate session token version
+  const validSession = await validateSession(session);
+  if (!validSession) {
+    const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    response.cookies.set(clearSessionCookie());
+    return response;
+  }
+
   const { searchParams } = new URL(request.url);
   const year = searchParams.get("year") || new Date().getFullYear().toString();
 
   const db = getDb();
-
-  // Verify user still exists in DB (guards against stale session cookies)
-  const user = db.prepare("SELECT id FROM users WHERE id = ?").get(session.userId);
-  if (!user) {
-    const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    response.cookies.set({ name: "session", value: "", path: "/", maxAge: 0 });
-    return response;
-  }
 
   const rows = db
     .prepare(
@@ -66,6 +48,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Validate session token version
+  const validSession = await validateSession(session);
+  if (!validSession) {
+    const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    response.cookies.set(clearSessionCookie());
+    return response;
+  }
+
   try {
     const body = await request.json();
     const { dateKey, text } = body;
@@ -85,14 +75,6 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getDb();
-
-    // Verify user still exists in DB
-    const user = db.prepare("SELECT id FROM users WHERE id = ?").get(session.userId);
-    if (!user) {
-      const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      response.cookies.set({ name: "session", value: "", path: "/", maxAge: 0 });
-      return response;
-    }
 
     // Check for existing entry
     const existing = db
@@ -126,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ entry: rowToEntry(row) }, { status: 201 });
   } catch (error) {
-    console.error("Create entry error:", error);
+    logger.error("entries.create", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

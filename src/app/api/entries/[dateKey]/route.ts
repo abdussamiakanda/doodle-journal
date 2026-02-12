@@ -1,27 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, validateSession, clearSessionCookie } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { JournalEntry, DateKey, DoodleId } from "@/types";
-
-interface EntryRow {
-  id: number;
-  user_id: number;
-  date_key: string;
-  text: string;
-  doodle_id: number;
-  created_at: string;
-  updated_at: string;
-}
-
-function rowToEntry(row: EntryRow): JournalEntry {
-  return {
-    dateKey: row.date_key as DateKey,
-    text: row.text,
-    doodleId: row.doodle_id as DoodleId,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
+import { logger } from "@/lib/logger";
+import { isValidDateKey } from "@/lib/dates";
+import { rowToEntry, EntryRow } from "@/lib/entries";
 
 export async function GET(
   _request: NextRequest,
@@ -32,7 +14,20 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Validate session token version
+  const validSession = await validateSession(session);
+  if (!validSession) {
+    const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    response.cookies.set(clearSessionCookie());
+    return response;
+  }
+
   const { dateKey } = await params;
+
+  // Validate date format
+  if (!isValidDateKey(dateKey)) {
+    return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
+  }
 
   const db = getDb();
   const row = db
@@ -55,7 +50,20 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Validate session token version
+  const validSession = await validateSession(session);
+  if (!validSession) {
+    const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    response.cookies.set(clearSessionCookie());
+    return response;
+  }
+
   const { dateKey } = await params;
+
+  // Validate date format
+  if (!isValidDateKey(dateKey)) {
+    return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
+  }
 
   try {
     const body = await request.json();
@@ -88,7 +96,7 @@ export async function PUT(
 
     return NextResponse.json({ entry: rowToEntry(updated) });
   } catch (error) {
-    console.error("Update entry error:", error);
+    logger.error("entries.update", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

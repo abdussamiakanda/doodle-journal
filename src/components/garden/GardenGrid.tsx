@@ -7,6 +7,7 @@ import { CellState, DateKey } from "@/types";
 import GardenCell from "./GardenCell";
 import YearHeader from "./YearHeader";
 import Card from "@/components/ui/Card";
+import Loading from "@/components/ui/Loading";
 
 export default function GardenGrid() {
   const { store, isLoaded, hasEntry, getEntry } = useJournal();
@@ -34,13 +35,7 @@ export default function GardenGrid() {
   const entryCount = store ? Object.keys(store.entries).length : 0;
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="font-display text-2xl text-garden-cream/50">
-          Loading your garden...
-        </p>
-      </div>
-    );
+    return <Loading message="Loading your garden..." />;
   }
 
   return (

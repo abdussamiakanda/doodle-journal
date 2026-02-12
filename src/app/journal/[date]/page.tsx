@@ -9,6 +9,7 @@ import JournalHeader from "@/components/journal/JournalHeader";
 import JournalEditor from "@/components/journal/JournalEditor";
 import EntryDisplay from "@/components/journal/EntryDisplay";
 import Button from "@/components/ui/Button";
+import Loading from "@/components/ui/Loading";
 
 export default function JournalPage() {
   const params = useParams();
@@ -53,8 +54,8 @@ export default function JournalPage() {
 
   if (!isLoaded) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="font-display text-2xl text-garden-cream/50">Loading...</p>
+      <main className="min-h-screen">
+        <Loading message="Loading entry..." />
       </main>
     );
   }

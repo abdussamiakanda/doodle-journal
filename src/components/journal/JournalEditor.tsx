@@ -59,17 +59,22 @@ export default function JournalEditor({ dateKey, onCancel }: JournalEditorProps)
 
   return (
     <div>
+      <label htmlFor="journal-entry" className="sr-only">
+        Journal entry text
+      </label>
       <textarea
+        id="journal-entry"
         className="journal-textarea"
         value={text}
         onChange={(e) => setText(e.target.value.slice(0, MAX_ENTRY_LENGTH))}
         placeholder="What happened today?"
         maxLength={MAX_ENTRY_LENGTH}
         autoFocus
+        aria-describedby="char-count"
       />
 
       <div className="flex items-center justify-between mt-4">
-        <span className="text-sm text-garden-ink/40">
+        <span id="char-count" className="text-sm text-garden-ink/40" aria-live="polite">
           {text.length}/{MAX_ENTRY_LENGTH}
         </span>
         <div className="flex gap-3">

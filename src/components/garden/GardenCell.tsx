@@ -8,14 +8,12 @@ interface GardenCellProps {
   dateKey: DateKey;
   state: CellState;
   doodleId?: DoodleId;
-  isNew?: boolean;
 }
 
 export default function GardenCell({
   dateKey,
   state,
   doodleId,
-  isNew = false,
 }: GardenCellProps) {
   const router = useRouter();
 
@@ -35,7 +33,6 @@ export default function GardenCell({
           doodleId={doodleId}
           size={28}
           color="#1A1A4E"
-          animate={isNew}
         />
       </button>
     );

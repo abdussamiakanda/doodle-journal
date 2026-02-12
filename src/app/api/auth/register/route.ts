@@ -2,11 +2,35 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getDb } from "@/lib/db";
 import { createSession, sessionCookieOptions } from "@/lib/auth";
+import { checkRateLimit, getClientIp, getRateLimitHeaders } from "@/lib/rate-limiter";
+import { logger } from "@/lib/logger";
+import {
+  BCRYPT_SALT_ROUNDS,
+  MIN_PASSWORD_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_PATTERN,
+  RATE_LIMIT_WINDOW_MS,
+  RATE_LIMIT_MAX_REQUESTS,
+} from "@/lib/constants";
 
-const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
-const MIN_PASSWORD_LENGTH = 6;
+const AUTH_RATE_LIMIT_CONFIG = { windowMs: RATE_LIMIT_WINDOW_MS, maxRequests: RATE_LIMIT_MAX_REQUESTS };
 
 export async function POST(request: NextRequest) {
+  // Rate limiting check
+  const clientIp = getClientIp(request);
+  const rateLimitResult = checkRateLimit(`register:${clientIp}`, AUTH_RATE_LIMIT_CONFIG);
+
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      { error: "Too many registration attempts. Please try again later." },
+      {
+        status: 429,
+        headers: getRateLimitHeaders(rateLimitResult, AUTH_RATE_LIMIT_CONFIG)
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { username, password } = body;
@@ -18,9 +42,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!USERNAME_RE.test(username)) {
+    if (!USERNAME_PATTERN.test(username) || username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
       return NextResponse.json(
-        { error: "Username must be 3-20 characters (letters, numbers, underscores)" },
+        { error: `Username must be ${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH} characters (letters, numbers, underscores)` },
         { status: 400 }
       );
     }
@@ -45,14 +69,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
     const result = db
       .prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)")
       .run(username, passwordHash);
 
     const userId = result.lastInsertRowid as number;
-    const token = await createSession({ userId, username });
+    const token = await createSession({ userId, username, tokenVersion: 0 });
 
     const response = NextResponse.json(
       { user: { id: userId, username } },
@@ -63,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Registration error:", error);
+    logger.error("auth.register", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

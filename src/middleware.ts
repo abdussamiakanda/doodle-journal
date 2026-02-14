@@ -37,13 +37,6 @@ function addSecurityHeaders(response: NextResponse): void {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Internal auth-check probe bypasses middleware auth to avoid recursion.
-  if (request.headers.get("x-internal-auth-check") === "1") {
-    const response = NextResponse.next();
-    addSecurityHeaders(response);
-    return response;
-  }
-
   if (
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith("/_next") ||
@@ -73,7 +66,6 @@ export async function middleware(request: NextRequest) {
         method: "GET",
         headers: {
           cookie: request.headers.get("cookie") ?? "",
-          "x-internal-auth-check": "1",
         },
         cache: "no-store",
       });

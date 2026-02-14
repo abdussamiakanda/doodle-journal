@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
   const rateLimitResult = checkRateLimit(`login:${clientIp}`, AUTH_RATE_LIMIT_CONFIG);
 
   if (!rateLimitResult.allowed) {
+    logger.warn("auth.login", `rate_limit_exceeded ip=${clientIp}`);
     return NextResponse.json(
       { error: "Too many login attempts. Please try again later." },
       {

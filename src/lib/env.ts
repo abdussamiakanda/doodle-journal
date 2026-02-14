@@ -5,13 +5,21 @@
 
 const requiredEnvVars = ["JWT_SECRET"] as const;
 
-const optionalEnvVars = ["DATABASE_PATH", "COOKIE_SECURE", "NODE_ENV"] as const;
+const optionalEnvVars = [
+  "DATABASE_PATH",
+  "COOKIE_SECURE",
+  "NODE_ENV",
+  "TRUST_PROXY",
+  "RATE_LIMIT_STORE",
+] as const;
 
 interface EnvConfig {
   jwtSecret: string;
   databasePath: string;
   cookieSecure: boolean;
   nodeEnv: string;
+  trustProxy: boolean;
+  rateLimitStore: "memory" | "redis";
 }
 
 let envConfig: EnvConfig | null = null;
@@ -37,11 +45,15 @@ export function validateEnv(): EnvConfig {
     );
   }
 
+  const rateLimitStore = process.env.RATE_LIMIT_STORE === "redis" ? "redis" : "memory";
+
   envConfig = {
     jwtSecret: process.env.JWT_SECRET!,
     databasePath: process.env.DATABASE_PATH || "data/journal.db",
     cookieSecure: process.env.COOKIE_SECURE !== "false",
     nodeEnv: process.env.NODE_ENV || "development",
+    trustProxy: process.env.TRUST_PROXY === "true",
+    rateLimitStore,
   };
 
   return envConfig;

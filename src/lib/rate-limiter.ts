@@ -1,30 +1,65 @@
 /**
- * Simple in-memory rate limiter for authentication endpoints
- * Tracks requests by IP address with sliding window
+ * Rate limiter with pluggable backing store.
+ * Default store is in-memory (single instance only).
  */
+
+import { logger } from "@/lib/logger";
+import { validateEnv } from "@/lib/env";
 
 interface RateLimitEntry {
   count: number;
   resetAt: number;
 }
 
-// Store for rate limit tracking
-const rateLimitStore = new Map<string, RateLimitEntry>();
+export interface RateLimitStore {
+  get(key: string): RateLimitEntry | undefined;
+  set(key: string, value: RateLimitEntry): void;
+  delete(key: string): void;
+  entries?(): IterableIterator<[string, RateLimitEntry]>;
+}
 
-// Cleanup old entries every 5 minutes
+class MemoryRateLimitStore implements RateLimitStore {
+  private store = new Map<string, RateLimitEntry>();
+
+  get(key: string): RateLimitEntry | undefined {
+    return this.store.get(key);
+  }
+
+  set(key: string, value: RateLimitEntry): void {
+    this.store.set(key, value);
+  }
+
+  delete(key: string): void {
+    this.store.delete(key);
+  }
+
+  entries(): IterableIterator<[string, RateLimitEntry]> {
+    return this.store.entries();
+  }
+}
+
+const memoryStore = new MemoryRateLimitStore();
+let activeStore: RateLimitStore = memoryStore;
+
+const env = validateEnv();
+if (env.rateLimitStore === "redis") {
+  logger.warn("rate-limit", "RATE_LIMIT_STORE=redis requested but redis adapter is not configured; falling back to memory store");
+}
+
+// Cleanup old entries every 5 minutes for in-memory store
 setInterval(() => {
+  if (activeStore !== memoryStore || !memoryStore.entries) return;
   const now = Date.now();
-  const entries = Array.from(rateLimitStore.entries());
-  for (const [key, entry] of entries) {
+  for (const [key, entry] of memoryStore.entries()) {
     if (entry.resetAt < now) {
-      rateLimitStore.delete(key);
+      memoryStore.delete(key);
     }
   }
 }, 5 * 60 * 1000);
 
 export interface RateLimitConfig {
-  windowMs: number;    // Time window in milliseconds
-  maxRequests: number; // Max requests per window
+  windowMs: number;
+  maxRequests: number;
 }
 
 export interface RateLimitResult {
@@ -34,16 +69,14 @@ export interface RateLimitResult {
 }
 
 const DEFAULT_CONFIG: RateLimitConfig = {
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 5,           // 5 requests per window
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 5,
 };
 
-/**
- * Check if a request should be rate limited
- * @param identifier - Unique identifier (typically IP address)
- * @param config - Rate limit configuration
- * @returns RateLimitResult indicating if request is allowed
- */
+export function setRateLimitStore(store: RateLimitStore): void {
+  activeStore = store;
+}
+
 export function checkRateLimit(
   identifier: string,
   config: RateLimitConfig = DEFAULT_CONFIG
@@ -51,23 +84,19 @@ export function checkRateLimit(
   const now = Date.now();
   const key = identifier;
 
-  const entry = rateLimitStore.get(key);
+  const entry = activeStore.get(key);
 
   if (!entry || entry.resetAt < now) {
-    // No entry or window expired - start fresh
-    rateLimitStore.set(key, {
-      count: 1,
-      resetAt: now + config.windowMs,
-    });
+    const resetAt = now + config.windowMs;
+    activeStore.set(key, { count: 1, resetAt });
     return {
       allowed: true,
       remaining: config.maxRequests - 1,
-      resetAt: now + config.windowMs,
+      resetAt,
     };
   }
 
   if (entry.count >= config.maxRequests) {
-    // Rate limit exceeded
     return {
       allowed: false,
       remaining: 0,
@@ -75,38 +104,41 @@ export function checkRateLimit(
     };
   }
 
-  // Increment counter
-  entry.count++;
+  const nextCount = entry.count + 1;
+  activeStore.set(key, { ...entry, count: nextCount });
+
   return {
     allowed: true,
-    remaining: config.maxRequests - entry.count,
+    remaining: config.maxRequests - nextCount,
     resetAt: entry.resetAt,
   };
 }
 
 /**
- * Extract client IP from request headers
- * Handles various proxy configurations
+ * Extract client IP from request headers.
+ * Only trusts proxy forwarding headers when TRUST_PROXY=true.
  */
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    // Take the first IP in the chain (original client)
-    return forwarded.split(",")[0].trim();
+  const { trustProxy } = validateEnv();
+
+  if (trustProxy) {
+    const forwarded = request.headers.get("x-forwarded-for");
+    if (forwarded) {
+      return forwarded.split(",")[0].trim();
+    }
+
+    const realIp = request.headers.get("x-real-ip");
+    if (realIp) {
+      return realIp.trim();
+    }
   }
 
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) {
-    return realIp.trim();
-  }
+  const cfConnectingIp = request.headers.get("cf-connecting-ip");
+  if (cfConnectingIp) return cfConnectingIp.trim();
 
-  // Fallback for development/edge cases
   return "unknown";
 }
 
-/**
- * Create rate limit response headers
- */
 export function getRateLimitHeaders(result: RateLimitResult, config: RateLimitConfig): HeadersInit {
   return {
     "X-RateLimit-Limit": config.maxRequests.toString(),

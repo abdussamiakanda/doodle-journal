@@ -19,6 +19,13 @@ const AUTH_RATE_LIMIT_CONFIG = { windowMs: RATE_LIMIT_WINDOW_MS, maxRequests: RA
 export async function POST(request: NextRequest) {
   // Rate limiting check
   const clientIp = getClientIp(request);
+  if (!clientIp) {
+    return NextResponse.json(
+      { error: "Unable to identify client" },
+      { status: 400 }
+    );
+  }
+
   const rateLimitResult = checkRateLimit(`register:${clientIp}`, AUTH_RATE_LIMIT_CONFIG);
 
   if (!rateLimitResult.allowed) {

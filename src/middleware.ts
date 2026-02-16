@@ -62,13 +62,22 @@ export async function middleware(request: NextRequest) {
     // (Middleware cannot directly use sqlite native bindings in edge runtime.)
     if (!pathname.startsWith("/api")) {
       const meUrl = new URL("/api/auth/me", request.url);
-      const meRes = await fetch(meUrl, {
-        method: "GET",
-        headers: {
-          cookie: request.headers.get("cookie") ?? "",
-        },
-        cache: "no-store",
-      });
+      let meRes;
+      try {
+        meRes = await fetch(meUrl, {
+          method: "GET",
+          headers: {
+            cookie: request.headers.get("cookie") ?? "",
+          },
+          cache: "no-store",
+        });
+      } catch {
+        // Network error - allow request to proceed with JWT validation already done
+        logger.warn("middleware.auth", "failed to reach token-version check endpoint");
+        const response = NextResponse.next();
+        addSecurityHeaders(response);
+        return response;
+      }
 
       if (meRes.status !== 200) {
         logger.warn("middleware.auth", "session invalidated during token-version check");

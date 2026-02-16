@@ -5,11 +5,37 @@ import { getRandomUnusedDoodleId } from "@/lib/doodle-pool";
 import { JournalEntry, DateKey, DoodleId } from "@/types";
 import { logger } from "@/lib/logger";
 import { rowToEntry, EntryRow } from "@/lib/entries";
+import { checkRateLimit, getClientIp, getRateLimitHeaders } from "@/lib/rate-limiter";
+import { MAX_ENTRY_LENGTH } from "@/lib/constants";
+
+const AUTH_RATE_LIMIT = { windowMs: 15 * 60 * 1000, maxRequests: 5 };
+const DATA_RATE_LIMIT = { windowMs: 15 * 60 * 1000, maxRequests: 30 };
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit GET requests
+  const clientIp = getClientIp(request);
+  if (!clientIp) {
+    return NextResponse.json(
+      { error: "Unable to identify client" },
+      { status: 400 }
+    );
+  }
+
+  const rateLimit = checkRateLimit(clientIp, DATA_RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    const response = NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429 }
+    );
+    Object.entries(getRateLimitHeaders(rateLimit, DATA_RATE_LIMIT)).forEach(
+      ([key, value]) => response.headers.set(key, value)
+    );
+    return response;
   }
 
   // Validate session token version
@@ -63,6 +89,13 @@ export async function POST(request: NextRequest) {
     if (!dateKey || !text || typeof text !== "string") {
       return NextResponse.json(
         { error: "dateKey and text are required" },
+        { status: 400 }
+      );
+    }
+
+    if (text.length > MAX_ENTRY_LENGTH) {
+      return NextResponse.json(
+        { error: `Entry text exceeds maximum length of ${MAX_ENTRY_LENGTH} characters` },
         { status: 400 }
       );
     }

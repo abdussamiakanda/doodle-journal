@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { isValidDateKey } from "@/lib/dates";
 import { rowToEntry, EntryRow } from "@/lib/entries";
+import { MAX_ENTRY_LENGTH } from "@/lib/constants";
 
 export async function GET(
   _request: NextRequest,
@@ -72,6 +73,13 @@ export async function PUT(
     if (!text || typeof text !== "string") {
       return NextResponse.json(
         { error: "text is required" },
+        { status: 400 }
+      );
+    }
+
+    if (text.length > MAX_ENTRY_LENGTH) {
+      return NextResponse.json(
+        { error: `Entry text exceeds maximum length of ${MAX_ENTRY_LENGTH} characters` },
         { status: 400 }
       );
     }

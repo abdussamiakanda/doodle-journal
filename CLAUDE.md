@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-One Year Doodle is a daily journal app with a visual garden metaphor. Each day of the year corresponds to a cell in a garden grid - users write one memory per day and get assigned a unique doodle (plant/flower/insect) to fill that cell. The app is built with Next.js 14 App Router, TypeScript, and SQLite.
+One Year Doodle is a daily journal app with a visual garden metaphor. Each day of the year corresponds to a cell in a garden grid - users write one memory per day and get assigned a unique doodle (plant/flower/insect) to fill that cell. The app is built with Next.js 14 App Router, TypeScript, and supports both SQLite (default) and PostgreSQL.
 
 ## Common Commands
 
@@ -37,6 +37,8 @@ npm run lint        # Run ESLint
 
 - **`src/lib/`** - Core business logic and utilities
   - `db.ts` - SQLite database singleton with schema initialization
+  - `db-pg.ts` - PostgreSQL connection pool with schema initialization
+  - `env.ts` - Environment variable validation (supports both SQLite and PostgreSQL)
   - `auth.ts` - JWT session management (jose library)
   - `api.ts` - Backend API client for data fetching
   - `dates.ts` - Date utilities for year calculations, validation
@@ -57,7 +59,9 @@ npm run lint        # Run ESLint
 ### Data Flow
 
 1. **Authentication**: JWT tokens stored in httpOnly cookies, verified in middleware
-2. **Database**: SQLite with better-sqlite3, single file at `data/journal.db`
+2. **Database**: SQLite (default) or PostgreSQL (when POSTGRES_URL is set)
+   - SQLite: single file at `data/journal.db`
+   - PostgreSQL: connection pooling via pg library
 3. **State Management**: React Context (useAuth, useJournal) synced with server via API
 4. **Doodle Assignment**: Server assigns random unused doodle ID on entry creation
 
@@ -70,11 +74,26 @@ npm run lint        # Run ESLint
 
 ### Environment Variables
 
-Required for production/Docker:
+Required:
 - `JWT_SECRET` - Secret key for JWT signing
-- `DATABASE_PATH` - SQLite database path (default: `data/journal.db`)
-- `COOKIE_SECURE` - Set to `false` for HTTP deployments (default: `true` in production)
+
+For SQLite (default):
+- `DATABASE_PATH` - Database path (default: `data/journal.db`)
+
+For PostgreSQL (serverless/deployment):
+- `POSTGRES_URL` - PostgreSQL connection string (e.g., `postgres://user:pass@host:5432/db`)
+
+Common:
+- `COOKIE_SECURE` - Set to `false` for HTTP (default: `true` in production)
 
 ### Docker Deployment
 
-Uses multi-stage Alpine build with persistent volume for SQLite data. The database lives at `/app/data/journal.db` inside the container.
+Uses multi-stage Alpine build with docker-compose. Two modes:
+
+**SQLite mode (default)**:
+- Data persisted in Docker volume at `/app/data/journal.db`
+
+**PostgreSQL mode**:
+- Uses `postgres:16-alpine` service
+- Set `POSTGRES_URL` environment variable to connect
+- Recommended for serverless deployments (Vercel, etc.)

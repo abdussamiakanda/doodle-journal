@@ -5,6 +5,7 @@ A daily journal app with a visual garden metaphor. Write one memory per day and 
 ![One Year Doodle](https://img.shields.io/badge/Next.js-14.2-black?style=flat&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat&logo=typescript)
 ![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003b57?style=flat&logo=sqlite)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)
 
 ## Features
 
@@ -21,7 +22,7 @@ A daily journal app with a visual garden metaphor. Write one memory per day and 
 - **Framework**: Next.js 14 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
-- **Database**: SQLite with better-sqlite3
+- **Database**: SQLite (default) or PostgreSQL (serverless)
 - **Authentication**: JWT tokens stored in httpOnly cookies
 - **Deployment**: Docker with multi-stage Alpine build
 
@@ -57,7 +58,12 @@ cp .env.local.example .env.local
 4. Set your environment variables:
 ```env
 JWT_SECRET=your-super-secret-key-change-this
+# For SQLite (default):
 DATABASE_PATH=data/journal.db
+
+# OR for PostgreSQL (serverless):
+# POSTGRES_URL=postgres://user:pass@localhost:5432/doodle_journal
+
 COOKIE_SECURE=false
 ```
 
@@ -78,7 +84,9 @@ npm start
 
 ## Docker Deployment
 
-The easiest way to deploy is using Docker Compose:
+The easiest way to deploy is using Docker Compose. Two modes are supported:
+
+### SQLite Mode (Default)
 
 ```bash
 docker-compose up -d
@@ -90,16 +98,38 @@ This will:
 - Persist your journal data in a Docker volume
 - Configure health checks
 
+### PostgreSQL Mode (Recommended for Serverless)
+
+For serverless deployments (Vercel, etc.), use PostgreSQL:
+
+```bash
+# Set environment variables
+export JWT_SECRET=your-production-secret
+export POSTGRES_PASSWORD=your-db-password
+
+# Start with PostgreSQL
+docker-compose up -d
+```
+
 The app will be available at [http://localhost:3000](http://localhost:3000).
 
 ### Environment Variables for Docker
 
 Create a `.env` file in the project root:
 
+**SQLite mode:**
 ```env
 JWT_SECRET=your-production-secret-key-here
 DATABASE_PATH=data/journal.db
-COOKIE_SECURE=true  # Set to false for HTTP deployments
+COOKIE_SECURE=true
+```
+
+**PostgreSQL mode:**
+```env
+JWT_SECRET=your-production-secret-key-here
+POSTGRES_URL=postgres://doodle:password@postgres:5432/doodle_journal
+POSTGRES_PASSWORD=your-db-password
+COOKIE_SECURE=true
 ```
 
 ## Project Structure
@@ -125,6 +155,8 @@ src/
 │   └── useStorage.tsx         # Data synchronization
 ├── lib/
 │   ├── db.ts                  # SQLite database setup
+│   ├── db-pg.ts               # PostgreSQL connection pool
+│   ├── env.ts                 # Environment variable validation
 │   ├── auth.ts                # JWT session management
 │   ├── api.ts                 # Backend API client
 │   ├── dates.ts               # Date utilities
@@ -159,10 +191,18 @@ All dates use the `DateKey` type: `"YYYY-MM-DD"` string format. This ensures con
 
 ### Database Schema
 
+SQLite:
 ```sql
-users (id, username, password_hash, created_at)
+users (id, username, password_hash, token_version, created_at)
 entries (id, user_id, date_key, text, doodle_id, created_at, updated_at)
 UNIQUE(user_id, date_key)  -- One entry per user per day
+```
+
+PostgreSQL:
+```sql
+users (id SERIAL, username VARCHAR(255), password_hash TEXT, token_version INTEGER, created_at TIMESTAMP)
+entries (id SERIAL, user_id INTEGER REFERENCES users(id), date_key VARCHAR(10), text TEXT, doodle_id INTEGER, created_at TIMESTAMP, updated_at TIMESTAMP)
+UNIQUE(user_id, date_key)
 ```
 
 ## License

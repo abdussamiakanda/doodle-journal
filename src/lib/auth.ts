@@ -59,13 +59,31 @@ export async function validateSession(session: SessionPayload | null): Promise<S
   if (!session) return null;
 
   // Dynamic import to avoid circular dependency
-  const { getDb } = await import("./db");
-  const db = getDb();
+  const { query } = await import("./db-pg");
+  const { getEnv } = await import("./env");
 
-  const user = db
-    .prepare("SELECT token_version FROM users WHERE id = ?")
-    .get(session.userId) as { token_version: number } | undefined;
+  const env = getEnv();
+  if (!env?.usePostgres) {
+    // Fallback to SQLite
+    const { getDb } = await import("./db");
+    const db = getDb();
+    const user = db
+      .prepare("SELECT token_version FROM users WHERE id = ?")
+      .get(session.userId) as { token_version: number } | undefined;
 
+    if (!user || user.token_version !== session.tokenVersion) {
+      return null;
+    }
+    return session;
+  }
+
+  // Use PostgreSQL
+  const result = await query<{ token_version: number }>(
+    "SELECT token_version FROM users WHERE id = $1",
+    [session.userId]
+  );
+
+  const user = result.rows[0];
   if (!user || user.token_version !== session.tokenVersion) {
     return null;
   }
@@ -77,10 +95,20 @@ export async function validateSession(session: SessionPayload | null): Promise<S
  * Invalidate all sessions for a user by incrementing their token version
  */
 export async function invalidateUserSessions(userId: number): Promise<void> {
-  const { getDb } = await import("./db");
-  const db = getDb();
+  const { getEnv } = await import("./env");
 
-  db.prepare("UPDATE users SET token_version = token_version + 1 WHERE id = ?").run(userId);
+  const env = getEnv();
+  if (!env?.usePostgres) {
+    // Fallback to SQLite
+    const { getDb } = await import("./db");
+    const db = getDb();
+    db.prepare("UPDATE users SET token_version = token_version + 1 WHERE id = ?").run(userId);
+    return;
+  }
+
+  // Use PostgreSQL
+  const { query } = await import("./db-pg");
+  await query("UPDATE users SET token_version = token_version + 1 WHERE id = $1", [userId]);
 }
 
 export function sessionCookieOptions(token: string) {

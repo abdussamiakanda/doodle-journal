@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getDb } from "@/lib/db";
+import { query } from "@/lib/db-pg";
+import { getEnv } from "@/lib/env";
 import { createSession, sessionCookieOptions } from "@/lib/auth";
 import { checkRateLimit, getClientIp, getRateLimitHeaders } from "@/lib/rate-limiter";
 import { logger } from "@/lib/logger";
@@ -49,11 +51,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDb();
+    const env = getEnv();
+    let user: UserRow | undefined;
 
-    const user = db
-      .prepare("SELECT id, username, password_hash, token_version FROM users WHERE username = ?")
-      .get(username) as UserRow | undefined;
+    if (env?.usePostgres) {
+      // PostgreSQL path
+      const result = await query<UserRow>(
+        "SELECT id, username, password_hash, token_version FROM users WHERE username = $1",
+        [username]
+      );
+      user = result.rows[0];
+    } else {
+      // SQLite fallback
+      const db = getDb();
+      user = db
+        .prepare("SELECT id, username, password_hash, token_version FROM users WHERE username = ?")
+        .get(username) as UserRow | undefined;
+    }
 
     if (!user) {
       return NextResponse.json(

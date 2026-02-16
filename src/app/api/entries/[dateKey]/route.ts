@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, validateSession, clearSessionCookie } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { query } from "@/lib/db-pg";
+import { getEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { isValidDateKey } from "@/lib/dates";
 import { rowToEntry, EntryRow } from "@/lib/entries";
 import { MAX_ENTRY_LENGTH } from "@/lib/constants";
+import { JournalEntry } from "@/types";
 
 export async function GET(
   _request: NextRequest,
@@ -30,10 +33,23 @@ export async function GET(
     return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
   }
 
-  const db = getDb();
-  const row = db
-    .prepare("SELECT * FROM entries WHERE user_id = ? AND date_key = ?")
-    .get(session.userId, dateKey) as EntryRow | undefined;
+  const env = getEnv();
+  let row: EntryRow | undefined;
+
+  if (env?.usePostgres) {
+    // PostgreSQL path
+    const result = await query<EntryRow>(
+      "SELECT id, user_id, date_key, text, doodle_id, created_at, updated_at FROM entries WHERE user_id = $1 AND date_key = $2",
+      [session.userId, dateKey]
+    );
+    row = result.rows[0];
+  } else {
+    // SQLite fallback
+    const db = getDb();
+    row = db
+      .prepare("SELECT * FROM entries WHERE user_id = ? AND date_key = ?")
+      .get(session.userId, dateKey) as EntryRow | undefined;
+  }
 
   if (!row) {
     return NextResponse.json({ error: "Entry not found" }, { status: 404 });
@@ -84,25 +100,55 @@ export async function PUT(
       );
     }
 
-    const db = getDb();
+    const env = getEnv();
+    let entry: JournalEntry;
 
-    const existing = db
-      .prepare("SELECT * FROM entries WHERE user_id = ? AND date_key = ?")
-      .get(session.userId, dateKey) as EntryRow | undefined;
+    if (env?.usePostgres) {
+      // PostgreSQL path
+      const existing = await query<EntryRow>(
+        "SELECT id, user_id, date_key, text, doodle_id, created_at, updated_at FROM entries WHERE user_id = $1 AND date_key = $2",
+        [session.userId, dateKey]
+      );
 
-    if (!existing) {
-      return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+      if (!existing.rows[0]) {
+        return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+      }
+
+      await query(
+        "UPDATE entries SET text = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+        [text.trim(), existing.rows[0].id]
+      );
+
+      const updated = await query<EntryRow>(
+        "SELECT id, user_id, date_key, text, doodle_id, created_at, updated_at FROM entries WHERE id = $1",
+        [existing.rows[0].id]
+      );
+
+      entry = rowToEntry(updated.rows[0]);
+    } else {
+      // SQLite fallback
+      const db = getDb();
+
+      const existing = db
+        .prepare("SELECT * FROM entries WHERE user_id = ? AND date_key = ?")
+        .get(session.userId, dateKey) as EntryRow | undefined;
+
+      if (!existing) {
+        return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+      }
+
+      db.prepare(
+        "UPDATE entries SET text = ?, updated_at = datetime('now') WHERE id = ?"
+      ).run(text.trim(), existing.id);
+
+      const updated = db
+        .prepare("SELECT * FROM entries WHERE id = ?")
+        .get(existing.id) as EntryRow;
+
+      entry = rowToEntry(updated);
     }
 
-    db.prepare(
-      "UPDATE entries SET text = ?, updated_at = datetime('now') WHERE id = ?"
-    ).run(text.trim(), existing.id);
-
-    const updated = db
-      .prepare("SELECT * FROM entries WHERE id = ?")
-      .get(existing.id) as EntryRow;
-
-    return NextResponse.json({ entry: rowToEntry(updated) });
+    return NextResponse.json({ entry });
   } catch (error) {
     logger.error("entries.update", error);
     return NextResponse.json(

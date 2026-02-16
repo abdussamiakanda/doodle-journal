@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getDb } from "@/lib/db";
+import { query } from "@/lib/db-pg";
+import { getEnv } from "@/lib/env";
 import { createSession, sessionCookieOptions } from "@/lib/auth";
 import { checkRateLimit, getClientIp, getRateLimitHeaders } from "@/lib/rate-limiter";
 import { logger } from "@/lib/logger";
@@ -64,26 +66,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDb();
+    const env = getEnv();
+    let userId: number;
 
-    const existing = db
-      .prepare("SELECT id FROM users WHERE username = ?")
-      .get(username);
-
-    if (existing) {
-      return NextResponse.json(
-        { error: "Username already taken" },
-        { status: 409 }
+    if (env?.usePostgres) {
+      // PostgreSQL path
+      const existing = await query<{ id: number }>(
+        "SELECT id FROM users WHERE username = $1",
+        [username]
       );
+
+      if (existing.rows.length > 0) {
+        return NextResponse.json(
+          { error: "Username already taken" },
+          { status: 409 }
+        );
+      }
+
+      const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+
+      const result = await query<{ id: number }>(
+        "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id",
+        [username, passwordHash]
+      );
+
+      userId = result.rows[0].id;
+    } else {
+      // SQLite fallback
+      const db = getDb();
+
+      const existing = db
+        .prepare("SELECT id FROM users WHERE username = ?")
+        .get(username);
+
+      if (existing) {
+        return NextResponse.json(
+          { error: "Username already taken" },
+          { status: 409 }
+        );
+      }
+
+      const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+
+      const result = db
+        .prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)")
+        .run(username, passwordHash);
+
+      userId = result.lastInsertRowid as number;
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
-
-    const result = db
-      .prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)")
-      .run(username, passwordHash);
-
-    const userId = result.lastInsertRowid as number;
     const token = await createSession({ userId, username, tokenVersion: 0 });
 
     const response = NextResponse.json(

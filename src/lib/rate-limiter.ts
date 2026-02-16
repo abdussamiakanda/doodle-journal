@@ -117,8 +117,9 @@ export function checkRateLimit(
 /**
  * Extract client IP from request headers.
  * Only trusts proxy forwarding headers when TRUST_PROXY=true.
+ * Returns null if no IP can be determined.
  */
-export function getClientIp(request: Request): string {
+export function getClientIp(request: Request): string | null {
   const { trustProxy } = validateEnv();
 
   if (trustProxy) {
@@ -136,7 +137,7 @@ export function getClientIp(request: Request): string {
   const cfConnectingIp = request.headers.get("cf-connecting-ip");
   if (cfConnectingIp) return cfConnectingIp.trim();
 
-  return "unknown";
+  return null;
 }
 
 export function getRateLimitHeaders(result: RateLimitResult, config: RateLimitConfig): HeadersInit {

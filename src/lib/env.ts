@@ -7,6 +7,7 @@ const requiredEnvVars = ["JWT_SECRET"] as const;
 
 const optionalEnvVars = [
   "DATABASE_PATH",
+  "POSTGRES_URL",
   "COOKIE_SECURE",
   "NODE_ENV",
   "TRUST_PROXY",
@@ -16,6 +17,8 @@ const optionalEnvVars = [
 interface EnvConfig {
   jwtSecret: string;
   databasePath: string;
+  postgresUrl: string;
+  usePostgres: boolean;
   cookieSecure: boolean;
   nodeEnv: string;
   trustProxy: boolean;
@@ -46,10 +49,14 @@ export function validateEnv(): EnvConfig {
   }
 
   const rateLimitStore = process.env.RATE_LIMIT_STORE === "redis" ? "redis" : "memory";
+  const postgresUrl = process.env.POSTGRES_URL || "";
+  const usePostgres = !!postgresUrl;
 
   envConfig = {
     jwtSecret: process.env.JWT_SECRET!,
     databasePath: process.env.DATABASE_PATH || "data/journal.db",
+    postgresUrl,
+    usePostgres,
     cookieSecure: process.env.COOKIE_SECURE !== "false",
     nodeEnv: process.env.NODE_ENV || "development",
     trustProxy: process.env.TRUST_PROXY === "true",

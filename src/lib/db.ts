@@ -13,14 +13,23 @@ export function getDb(): Database.Database {
   // Validate environment variables on first database access
   const env = validateEnv();
 
-  // Synchronous initialization for first call
-  // This is safe in Node.js single-threaded event loop
-  const dbPath = path.resolve(process.cwd(), env.databasePath);
+  // Resolve the database path
+  let dbPath = path.resolve(process.cwd(), env.databasePath);
 
   // Ensure the directory exists
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (err) {
+      // If directory creation fails (e.g., serverless /var/task), use /tmp
+      // Note: Data won't persist across invocations in serverless
+      const tmpDir = "/tmp/data";
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+      dbPath = path.join(tmpDir, "journal.db");
+    }
   }
 
   db = new Database(dbPath);

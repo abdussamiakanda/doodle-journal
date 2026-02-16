@@ -24,6 +24,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
 .env*.local
 
 # vercel
@@ -38,3 +39,11 @@ next-env.d.ts
 *.db
 *.db-journal
 *.db-wal
+
+# postgresql
+# Local PostgreSQL data directory (if running outside Docker)
+postgres-data/
+
+# docker
+# PostgreSQL container data
+*.sql

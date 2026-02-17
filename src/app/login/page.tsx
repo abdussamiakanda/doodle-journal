@@ -88,7 +88,7 @@ export default function LoginPage() {
               className="w-full px-4 py-3 rounded-xl bg-garden-cream-dark text-garden-ink
                 font-body text-base placeholder:text-garden-ink/30
                 focus:outline-none focus:ring-2 focus:ring-garden-accent/30"
-              placeholder={isRegister ? "6+ characters" : "Enter password"}
+              placeholder={isRegister ? "8+ characters" : "Enter password"}
               autoComplete={isRegister ? "new-password" : "current-password"}
               required
             />

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Simple plant/flower doodle favicon for One Year Doodle -->
+  
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#22c55e" opacity="0.15"/>
+  
+  <!-- Stem -->
+  <path d="M 50 50 L 50 75" stroke="#22c55e" stroke-width="5" stroke-linecap="round"/>
+  
+  <!-- Leaves -->
+  <path d="M 50 60 Q 35 55 30 50" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M 50 60 Q 65 55 70 50" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round"/>
+  
+  <!-- Flower center -->
+  <circle cx="50" cy="40" r="10" fill="#fbbf24"/>
+  
+  <!-- Petals (simplified for small size) -->
+  <circle cx="50" cy="30" r="7" fill="#f59e0b"/>
+  <circle cx="40" cy="35" r="7" fill="#f59e0b"/>
+  <circle cx="60" cy="35" r="7" fill="#f59e0b"/>
+  <circle cx="45" cy="45" r="7" fill="#f59e0b"/>
+  <circle cx="55" cy="45" r="7" fill="#f59e0b"/>
+  
+  <!-- Center dot -->
+  <circle cx="50" cy="40" r="5" fill="#dc2626"/>
+</svg>

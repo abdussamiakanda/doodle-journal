@@ -2,9 +2,6 @@
 
 A daily journal app with a visual garden metaphor: each day of the year is a cell in a grid. Write one memory per day and get a unique doodle (plant, flower, or insect) for that cell.
 
-![Garden View](./screenshots/garden.png)
-*The garden grid showing your year of memories*
-
 ## Features
 
 - **🌱 Visual Garden**: Year grid where each cell represents a day—empty, today (glowing dot), or filled with a unique doodle
@@ -12,9 +9,7 @@ A daily journal app with a visual garden metaphor: each day of the year is a cel
 - **🎨 Unique Doodles**: Each entry gets a random doodle from a pool of 50 icons (no duplicates in your year)
 - **🔐 Secure Auth**: Email/password authentication via Supabase with Row Level Security
 - **📱 Responsive Design**: Works beautifully on desktop and mobile devices
-
-![Journal Editor](./screenshots/journal-editor.png)
-*Writing today's memory*
+- **🌓 Dark Mode**: Toggle between light and dark themes
 
 ## Tech Stack
 
@@ -70,17 +65,17 @@ A daily journal app with a visual garden metaphor: each day of the year is a cel
 
 ## Screenshots
 
-### Login Screen
-![Login](./screenshots/login.png)
-*Sign up or sign in to start journaling*
-
 ### Garden View
 ![Garden Grid](./screenshots/garden.png)
 *The main garden grid showing all 365 days*
 
 ### Journal Entry
-![Journal Entry](./screenshots/journal-entry.png)
+![Journal Entry](./screenshots/entry.png)
 *Viewing a past entry with its doodle*
+
+### Login Screen
+![Login](./screenshots/login.png)
+*Sign up or sign in to start journaling*
 
 ## Project Structure
 
@@ -90,7 +85,7 @@ src/
 │   ├── garden/          # GardenGrid, GardenCell, YearHeader
 │   ├── journal/         # JournalEditor, EntryDisplay, JournalHeader
 │   ├── doodles/         # DoodleIcon component
-│   └── ui/              # Button, Card, Loading
+│   └── ui/              # Button, Card, Loading, ThemeToggle
 ├── contexts/
 │   ├── AuthContext.jsx  # Authentication state
 │   └── JournalContext.jsx # Journal entries state
@@ -144,6 +139,7 @@ See `supabase-schema.sql` for the complete schema including:
 3. **Today's Entry**: Click today's cell (glowing dot) to write your memory
 4. **Past Entries**: Click any filled cell to view that day's entry
 5. **Doodle Assignment**: Each new entry gets a random unused doodle from the pool
+6. **Dark Mode**: Toggle theme using the sun/moon icon in the header
 
 ## Troubleshooting
 
